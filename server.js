@@ -380,6 +380,14 @@ function endSession(session) {
 
 const app = express();
 app.use(express.json());
+
+console.log(
+  'SESSION_SECRET 값 확인:',
+  process.env.SESSION_SECRET
+    ? '값 있음 (길이: ' + process.env.SESSION_SECRET.length + ')'
+    : '값 없음(undefined)'
+);
+
 app.use(
   expressSession({
     secret: process.env.SESSION_SECRET,
