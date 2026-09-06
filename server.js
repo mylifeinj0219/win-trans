@@ -5,6 +5,13 @@ require('dotenv').config({ override: false });
 console.log('전체 환경변수 개수:', Object.keys(process.env).length);
 console.log('SESSION_SECRET 존재 여부:', 'SESSION_SECRET' in process.env);
 
+const dns = require('dns');
+// 로컬(Windows, IPv4 위주 네트워크)에서는 정상 작동하는 streamingRecognize가 Railway/Cloud Run
+// (둘 다 IPv6가 기본 활성화된 컨테이너 네트워크)에서만 "12 UNIMPLEMENTED"로 실패 — 인증 방식이
+// 서로 다른 두 플랫폼(Railway=JWT 키, Cloud Run=ADC)에서 동일하게 재현되는 걸로 봐서 인증/코드가
+// 아니라 네트워크 계층(IPv6 경로 이상) 문제일 가능성이 있어 IPv4를 우선하도록 강제해 검증한다.
+dns.setDefaultResultOrder('ipv4first');
+
 const http = require('http');
 const fs = require('fs');
 const os = require('os');
