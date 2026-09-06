@@ -33,6 +33,15 @@ const PORT = process.env.PORT || 3000;
 function loadGoogleAuthOptions() {
   if (process.env.GOOGLE_CREDENTIALS_JSON) {
     const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    // Railway 환경변수 입력창에 붙여넣는 과정에서 private_key의 개행이 깨지는 경우가 있어,
+    // 그런 손상을 배포 환경 로그에서 바로 알아챌 수 있도록 형태만 점검(값 자체는 출력하지 않음)
+    const pk = credentials.private_key || '';
+    console.log('GOOGLE_CREDENTIALS_JSON 사용:', {
+      project_id: credentials.project_id || '(없음)',
+      client_email: credentials.client_email || '(없음)',
+      private_key_looks_valid:
+        pk.startsWith('-----BEGIN PRIVATE KEY-----') && pk.trimEnd().endsWith('-----END PRIVATE KEY-----'),
+    });
     return { credentials, projectId: credentials.project_id };
   }
   return { keyFilename: path.join(__dirname, 'gcloud-key.json') };
