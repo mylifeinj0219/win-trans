@@ -59,6 +59,31 @@ function loadGoogleAuthOptions() {
 
 const googleAuthOptions = loadGoogleAuthOptions();
 
+// 로컬(Windows)에서는 정상 동작하는 streamingRecognize가 Railway/Cloud Run(둘 다 Linux 컨테이너)
+// 에서만 "12 UNIMPLEMENTED"로 실패하는 상황이라, 코드/설정(request, credentials)은 이미 여러 차례
+// 재현 테스트로 검증을 마쳤고 — Node 런타임/의존성 버전이 배포 환경에서 실제로 무엇인지가
+// 남은 유력한 변수라 아래에서 확인한다. package-lock.json이 커밋되어 있어 npm ci로 설치되는
+// 패키지 버전 자체는 로컬과 동일해야 하지만, 실제 Node.js 버전(Docker 베이스 이미지/Railway
+// Nixpacks가 고른 버전)은 다를 수 있다.
+function readInstalledVersion(pkgName) {
+  try {
+    // google-gax처럼 package.json의 "exports"가 하위 경로 require를 막아둔 패키지도 있어,
+    // require() 대신 node_modules 안의 package.json을 직접 읽는다.
+    const pkgJsonPath = path.join(__dirname, 'node_modules', pkgName, 'package.json');
+    return JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8')).version;
+  } catch (err) {
+    return `확인 불가(${err.message})`;
+  }
+}
+
+console.log('런타임 정보:', {
+  node: process.version,
+  platform: process.platform,
+  arch: process.arch,
+  grpcJs: readInstalledVersion('@grpc/grpc-js'),
+  googleGax: readInstalledVersion('google-gax'),
+});
+
 const translateClient = new Translate(googleAuthOptions);
 
 const anthropicClient = process.env.ANTHROPIC_API_KEY
