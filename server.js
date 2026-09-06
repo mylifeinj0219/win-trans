@@ -22,9 +22,20 @@ const speech = require('@google-cloud/speech');
 const { Translate } = require('@google-cloud/translate').v2;
 
 const PORT = process.env.PORT || 3000;
-const keyFilename = path.join(__dirname, 'gcloud-key.json');
 
-const translateClient = new Translate({ keyFilename });
+// 로컬에서는 gcloud-key.json 파일을, Railway 등 클라우드 배포 환경에서는 파일을 올릴 수 없으므로
+// 키 내용 전체를 담은 GOOGLE_CREDENTIALS_JSON 환경변수를 우선적으로 사용
+function loadGoogleAuthOptions() {
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    return { credentials, projectId: credentials.project_id };
+  }
+  return { keyFilename: path.join(__dirname, 'gcloud-key.json') };
+}
+
+const googleAuthOptions = loadGoogleAuthOptions();
+
+const translateClient = new Translate(googleAuthOptions);
 
 const anthropicClient = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -577,7 +588,7 @@ ${rawText}
 }
 
 function startRecognizeStream(ws, session) {
-  const client = new speech.SpeechClient({ keyFilename });
+  const client = new speech.SpeechClient(googleAuthOptions);
 
   let interimTimer = null; // 잠정 번역 표시용 디바운스 (기존 기능)
   let earlyFinalTimer = null; // 한국어 문장 종결 어미 감지 후 조기 확정용 디바운스
