@@ -2,6 +2,9 @@
 // .env 파일 내용으로 덮어쓰지 않고 시스템 값을 그대로 둔다. 로컬에서 .env가 없을 때만 이걸로 채워짐.
 require('dotenv').config({ override: false });
 
+console.log('전체 환경변수 개수:', Object.keys(process.env).length);
+console.log('SESSION_SECRET 존재 여부:', 'SESSION_SECRET' in process.env);
+
 const http = require('http');
 const fs = require('fs');
 const os = require('os');
