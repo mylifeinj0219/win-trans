@@ -28,8 +28,10 @@ const { Translate } = require('@google-cloud/translate').v2;
 
 const PORT = process.env.PORT || 3000;
 
-// 로컬에서는 gcloud-key.json 파일을, Railway 등 클라우드 배포 환경에서는 파일을 올릴 수 없으므로
-// 키 내용 전체를 담은 GOOGLE_CREDENTIALS_JSON 환경변수를 우선적으로 사용
+// 우선순위: GOOGLE_CREDENTIALS_JSON 환경변수(Railway 등, 키 파일을 올릴 수 없는 환경)
+//        > 로컬 gcloud-key.json 파일
+//        > 둘 다 없으면 옵션 없이 생성 — Cloud Run에서는 이 경우 메타데이터 서버를 통해
+//          연결된 서비스 계정으로 자동 인증(Application Default Credentials)된다.
 function loadGoogleAuthOptions() {
   if (process.env.GOOGLE_CREDENTIALS_JSON) {
     const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
@@ -44,7 +46,15 @@ function loadGoogleAuthOptions() {
     });
     return { credentials, projectId: credentials.project_id };
   }
-  return { keyFilename: path.join(__dirname, 'gcloud-key.json') };
+
+  const keyFilename = path.join(__dirname, 'gcloud-key.json');
+  if (fs.existsSync(keyFilename)) {
+    console.log('gcloud-key.json 파일로 Google Cloud 인증');
+    return { keyFilename };
+  }
+
+  console.log('GOOGLE_CREDENTIALS_JSON/gcloud-key.json 없음 — Application Default Credentials 사용(Cloud Run 서비스 계정 등)');
+  return {};
 }
 
 const googleAuthOptions = loadGoogleAuthOptions();
