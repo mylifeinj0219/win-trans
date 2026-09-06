@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로그인 - WIN TRANS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F9FC;
+    --primary: #2F6FED;
+    --primary-dark: #1E4FBB;
+    --accent-warm: #FF8A3D;
+    --card-bg: #FFFFFF;
+    --card-border: #E2E8F0;
+    --accent-bg: #EAF1FF;
+    --danger: #EF4444;
+    --text: #0F1B33;
+    --text-muted: #64748B;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+  }
+
+  /* ===================== 좌측 브랜드 패널 ===================== */
+  .brand-panel {
+    position: relative;
+    flex: 1 1 50%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 56px 64px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: linear-gradient(160deg, #EEF3FC 0%, var(--bg) 55%, #E8EFFC 100%);
+  }
+
+  /* 배경: 점 격자 패턴 + 은은한 원형 블롭 + 연결선(SVG)으로 만든 추상 "글로벌 네트워크" 텍스처
+     (저작권이 있을 수 있는 인물 사진 대신 CSS/SVG로 직접 구성) */
+  .brand-panel-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image: radial-gradient(rgba(47, 111, 237, 0.16) 1.4px, transparent 1.4px);
+    background-size: 26px 26px;
+    -webkit-mask-image: radial-gradient(ellipse 90% 80% at 60% 40%, #000 40%, transparent 85%);
+    mask-image: radial-gradient(ellipse 90% 80% at 60% 40%, #000 40%, transparent 85%);
+  }
+  .brand-panel-blob {
+    position: absolute;
+    z-index: 0;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.5;
+  }
+  .brand-panel-blob.b1 { width: 340px; height: 340px; top: -80px; right: -60px; background: var(--accent-bg); }
+  .brand-panel-blob.b2 { width: 260px; height: 260px; bottom: 10%; left: -80px; background: #FFE7D3; opacity: 0.6; }
+
+  .brand-panel-arcs {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .brand-content { position: relative; z-index: 1; max-width: 440px; }
+
+  .brand-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+  .brand-logo-mark { width: 44px; height: 44px; flex: 0 0 auto; display: block; object-fit: contain; }
+  .brand-logo-text { display: flex; flex-direction: column; line-height: 1.15; }
+  .brand-logo-word {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: 21px;
+    color: var(--text);
+    letter-spacing: 0.01em;
+  }
+  .brand-logo-word span { color: var(--primary); }
+  .brand-logo-tagline { font-size: 11px; color: var(--text-muted); letter-spacing: 0.03em; }
+
+  .brand-headline {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: clamp(26px, 3vw, 34px);
+    line-height: 1.28;
+    margin: 0 0 16px;
+    color: var(--text);
+  }
+  .brand-headline .accent { color: var(--primary); }
+
+  .brand-subtext {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-muted);
+    margin: 0 0 32px;
+    max-width: 400px;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+  .feature-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    backdrop-filter: blur(2px);
+  }
+  .feature-item svg { width: 20px; height: 20px; flex: 0 0 auto; stroke: var(--primary); }
+  .feature-item span { font-size: 13px; font-weight: 500; color: var(--text); line-height: 1.3; }
+
+  /* 다양한 언어로 된 인사말 칩 — 사진/말풍선 대신 타이포그래피로만 표현한 장식 요소 */
+  .lang-chips { position: relative; height: 64px; }
+  .lang-chip {
+    position: absolute;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--shadow);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .lang-chip.c1 { left: 0; top: 6px; transform: rotate(-4deg); }
+  .lang-chip.c2 { left: 112px; top: 30px; transform: rotate(3deg); color: var(--primary); }
+  .lang-chip.c3 { left: 250px; top: 0; transform: rotate(-2deg); }
+  .lang-chip.c4 { left: 330px; top: 34px; transform: rotate(5deg); color: var(--accent-warm); }
+
+  /* ===================== 우측 로그인 카드 ===================== */
+  .login-panel {
+    flex: 1 1 50%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--card-bg);
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 380px;
+  }
+
+  .login-card-header { margin-bottom: 28px; }
+  .login-card-header h1 {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    line-height: 1.35;
+    margin: 0 0 8px;
+    color: var(--text);
+  }
+  .login-card-header h1 span { color: var(--primary); }
+  .login-card-header p { margin: 0; font-size: 14px; color: var(--text-muted); }
+
+  .field { margin-bottom: 14px; }
+
+  .input-icon-wrap { position: relative; }
+  .input-icon-wrap svg.leading-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    stroke: var(--text-muted);
+    pointer-events: none;
+  }
+
+  input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 13px 14px 13px 42px;
+    font-size: 15px;
+    font-family: 'Inter', sans-serif;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    color: var(--text);
+    background: var(--card-bg);
+  }
+  input[type="password"] { padding-right: 42px; }
+  input[type="text"]:focus, input[type="password"]:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.12);
+  }
+  input::placeholder { color: #A3AFC2; }
+
+  .toggle-password {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 4px;
+    margin: 0;
+    line-height: 0;
+    cursor: pointer;
+    color: var(--text-muted);
+  }
+  .toggle-password svg { width: 18px; height: 18px; stroke: currentColor; }
+
+  .remember-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0 20px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .remember-row input { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+
+  #loginBtn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--primary);
+    color: #fff;
+    border: 1px solid var(--primary);
+    border-radius: 10px;
+    padding: 13px 16px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  #loginBtn:hover:not(:disabled) { background: var(--primary-dark); border-color: var(--primary-dark); }
+  #loginBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #loginBtn svg { width: 17px; height: 17px; stroke: currentColor; }
+
+  #loginError {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--danger);
+    text-align: center;
+    min-height: 16px;
+  }
+
+  /* 모바일: 브랜드 패널은 숨기고 로그인 폼만 표시 */
+  @media (max-width: 860px) {
+    .brand-panel { display: none; }
+    .login-panel { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+  <aside class="brand-panel">
+    <div class="brand-panel-bg" aria-hidden="true"></div>
+    <div class="brand-panel-blob b1" aria-hidden="true"></div>
+    <div class="brand-panel-blob b2" aria-hidden="true"></div>
+    <svg class="brand-panel-arcs" viewBox="0 0 440 560" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M -20 420 C 100 360, 220 480, 460 340" fill="none" stroke="#2F6FED" stroke-opacity="0.18" stroke-width="1.5" stroke-dasharray="2 7" stroke-linecap="round"/>
+      <path d="M -20 200 C 140 260, 260 120, 460 190" fill="none" stroke="#2F6FED" stroke-opacity="0.14" stroke-width="1.5" stroke-dasharray="2 7" stroke-linecap="round"/>
+    </svg>
+
+    <div class="brand-content">
+      <div class="brand-logo">
+        <img class="brand-logo-mark" src="/assets/logo.png" alt="WIN TRANS 로고">
+        <div class="brand-logo-text">
+          <div class="brand-logo-word">WIN <span>TRANS</span></div>
+          <div class="brand-logo-tagline">Words Without Borders</div>
+        </div>
+      </div>
+
+      <h1 class="brand-headline">언어의 한계를 넘어,<br><span class="accent">사람을 더 가깝게</span></h1>
+      <p class="brand-subtext">실시간 음성 인식과 정확한 번역으로, 발표자와 청중이 언어 장벽 없이 하나의 대화로 연결됩니다.</p>
+
+      <div class="feature-grid">
+        <div class="feature-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+          <span>실시간 음성 인식</span>
+        </div>
+        <div class="feature-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          <span>다양한 언어 번역</span>
+        </div>
+        <div class="feature-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="8" y1="13" x2="16" y2="13"/>
+            <line x1="8" y1="17" x2="16" y2="17"/>
+          </svg>
+          <span>발표 자료 기반 정확도 향상</span>
+        </div>
+        <div class="feature-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span>여러 명 동시 접속</span>
+        </div>
+      </div>
+
+      <div class="lang-chips" aria-hidden="true">
+        <span class="lang-chip c1">Hello</span>
+        <span class="lang-chip c2">안녕하세요</span>
+        <span class="lang-chip c3">こんにちは</span>
+        <span class="lang-chip c4">Bonjour</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="login-panel">
+    <form class="login-card" id="loginForm">
+      <div class="login-card-header">
+        <h1><span>WIN TRANS</span>에<br>오신 것을 환영합니다.</h1>
+        <p>화자 계정으로 로그인하고 발표를 시작하세요.</p>
+      </div>
+
+      <div class="field">
+        <div class="input-icon-wrap">
+          <svg class="leading-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <label class="sr-only" for="usernameInput" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">아이디</label>
+          <input id="usernameInput" type="text" placeholder="아이디를 입력하세요" autocomplete="username" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="input-icon-wrap">
+          <svg class="leading-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <label class="sr-only" for="passwordInput" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">비밀번호</label>
+          <input id="passwordInput" type="password" placeholder="비밀번호를 입력하세요" autocomplete="current-password" required>
+          <button type="button" class="toggle-password" id="togglePassword" aria-label="비밀번호 표시">
+            <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <label class="remember-row">
+        <input type="checkbox" id="rememberInput">
+        로그인 상태 유지
+      </label>
+
+      <button id="loginBtn" type="submit">
+        로그인
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="5" y1="12" x2="19" y2="12"/>
+          <polyline points="12 5 19 12 12 19"/>
+        </svg>
+      </button>
+      <div id="loginError"></div>
+    </form>
+  </main>
+
+  <script>
+    const loginForm = document.getElementById('loginForm');
+    const usernameInput = document.getElementById('usernameInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const rememberInput = document.getElementById('rememberInput');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginError = document.getElementById('loginError');
+    const togglePassword = document.getElementById('togglePassword');
+    const eyeIcon = document.getElementById('eyeIcon');
+
+    const EYE_OPEN = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    const EYE_OFF = '<path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.8 21.8 0 0 1 5.06-6.06M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.8 21.8 0 0 1-3.22 4.36M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+
+    togglePassword.addEventListener('click', () => {
+      const showing = passwordInput.type === 'text';
+      passwordInput.type = showing ? 'password' : 'text';
+      eyeIcon.innerHTML = showing ? EYE_OPEN : EYE_OFF;
+      togglePassword.setAttribute('aria-label', showing ? '비밀번호 표시' : '비밀번호 숨기기');
+    });
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      loginBtn.disabled = true;
+      loginError.textContent = '';
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: usernameInput.value,
+            password: passwordInput.value,
+            remember: rememberInput.checked,
+          }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || '로그인에 실패했습니다.');
+
+        location.href = '/speaker.html';
+      } catch (err) {
+        loginError.textContent = err.message;
+        loginBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

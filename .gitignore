@@ -1,0 +1,10 @@
+node_modules/
+gcloud-key.json
+*.json.key
+win-trans-*.json
+.env
+.env.*
+*.log
+.claude/
+test-audio.m4a
+test-audio.mp3

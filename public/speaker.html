@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speaker - Live Speech Recognition</title>
+<link rel="stylesheet" href="/shared.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F9FC;
+    --primary: #2F6FED;
+    --card-bg: #FFFFFF;
+    --card-border: #E2E8F0;
+    --accent-bg: #EAF1FF;
+    --danger: #EF4444;
+    --text: #0F1B33;
+    --text-muted: #64748B;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+  }
+
+  body {
+    max-width: 1280px;
+    margin: 32px auto;
+    padding: 0 24px 48px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+  }
+
+  h1, h2, h3 { font-family: 'Manrope', sans-serif; font-weight: 700; color: var(--text); margin: 0 0 12px; }
+  h1 { font-size: 20px; margin-bottom: 20px; }
+  h2 { font-size: 16px; }
+  h3 { font-size: 13px; margin: 18px 0 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+  label {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  button {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    background: #fff;
+    color: var(--text);
+    padding: 10px 16px;
+    cursor: pointer;
+    margin-bottom: 0;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  input[type="text"], input[type="file"], textarea {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+
+  /* ===== 상단 세션 정보 바 ===== */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .topbar-info { min-width: 220px; }
+  #sessionNameInput {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 19px;
+    color: var(--text);
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 2px 0;
+    width: 100%;
+    max-width: 380px;
+  }
+  #sessionNameInput::placeholder { color: #A3AFC2; font-weight: 600; }
+  #sessionDateTimeEl { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+  .topbar-actions { display: flex; gap: 10px; }
+
+  #sessionBtn, #uploadBtn { background: var(--primary); color: #fff; border-color: var(--primary); }
+  #endSessionBtn { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+  #status { color: var(--text-muted); margin: 0 0 16px; font-size: 14px; }
+
+  /* ===== 카드 그리드 ===== */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  @media (min-width: 900px) {
+    /* 왼쪽(언어+마이크/슬라이드) : 실시간 인식·번역 : 참여 안내 = 1 : 1.5 : 1 */
+    /* align-items: stretch(기본값)로 각 컬럼이 그 행에서 가장 높은 컬럼(왼쪽)에 맞춰짐 */
+    .dashboard-grid { grid-template-columns: 1fr 1.5fr 1fr; align-items: stretch; }
+  }
+
+  .left-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* 카드 ① 언어 + 마이크 (화면에서 가장 시선을 끄는 요소) */
+  .mic-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 136px;
+    height: 136px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 0;
+    margin: 24px auto 8px;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(47, 111, 237, 0.38);
+  }
+  .mic-button svg { width: 56px; height: 56px; fill: currentColor; }
+  .mic-button:disabled { background: #C3CEE0; box-shadow: none; }
+  .mic-button.recording {
+    background: var(--danger);
+    box-shadow: 0 10px 28px rgba(239, 68, 68, 0.38);
+    animation: mic-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes mic-pulse {
+    0% { box-shadow: 0 10px 28px rgba(239, 68, 68, 0.38), 0 0 0 0 rgba(239, 68, 68, 0.45); }
+    70% { box-shadow: 0 10px 28px rgba(239, 68, 68, 0.38), 0 0 0 20px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 10px 28px rgba(239, 68, 68, 0.38), 0 0 0 0 rgba(239, 68, 68, 0); }
+  }
+  #micStatus { text-align: center; font-size: 13px; color: var(--text-muted); }
+
+  /* 카드 ② 슬라이드 미리보기 */
+  #uploadStatus { margin-top: 8px; font-size: 13px; color: var(--text-muted); }
+  #materialSummary {
+    margin-top: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 13px;
+    color: var(--text-muted);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    resize: vertical;
+  }
+  #slideViewer { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  #slideImage {
+    max-width: 100%;
+    max-height: 220px;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    flex: 1;
+    background: var(--accent-bg);
+  }
+  #slideCounter { margin-top: 6px; font-size: 13px; color: var(--text-muted); text-align: center; }
+
+  /* 카드 ③ 인식 + 번역 미리보기: 카드 전체 높이를 왼쪽 컬럼에 맞춰 늘리고,
+     늘어난 만큼을 두 로그 박스에 나눠줘서 내용이 적을 때는 여백이, 많을 때는 내부 스크롤이 생기게 함 */
+  #transcriptCard {
+    display: flex;
+    flex-direction: column;
+  }
+  #transcriptCard > h2,
+  #transcriptCard > h3,
+  #transcriptCard > #previewLangCombo {
+    flex: 0 0 auto;
+  }
+  #transcriptLog, #previewTranscriptLog {
+    border: 1px solid var(--card-border);
+    background: var(--accent-bg);
+    border-radius: 8px;
+    min-height: 0; /* flex 자식이 내용 크기 때문에 줄어들지 못하는 문제 방지 (내부 스크롤이 정상 동작하도록) */
+  }
+  #transcriptLog { flex: 1.4 1 150px; font-size: 16px; }
+  #previewTranscriptLog { flex: 1 1 100px; font-size: 15px; margin-top: 8px; }
+
+  /* 카드 ④ 참여 안내 */
+  #sharePlaceholder { color: var(--text-muted); font-size: 13px; }
+  #qrImage { width: 130px; height: 130px; border: 1px solid var(--card-border); border-radius: 8px; display: block; margin-bottom: 12px; }
+  #sessionCode { font-family: 'Manrope', sans-serif; font-size: 24px; font-weight: 700; letter-spacing: 2px; margin: 4px 0 10px; }
+  #joinUrlRow input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    font-size: 12px;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    color: var(--text-muted);
+  }
+  #listenerStats { margin: 10px 0; font-size: 13px; color: var(--text-muted); }
+  #shareButtons { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  #shareToast {
+    font-size: 12px;
+    color: #1c7a3c;
+    background: #E7F8ED;
+    border: 1px solid #BFE9CC;
+    border-radius: 4px;
+    padding: 4px 8px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  #shareToast.visible { opacity: 1; }
+
+  /* 세션 시작 전 빈 카드에 보여주는 안내 텍스트 */
+  .log-placeholder {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: 1px solid var(--card-border);
+    background: var(--accent-bg);
+    border-radius: 8px;
+    color: #94A3B8;
+    font-size: 13px;
+    padding: 16px;
+  }
+  /* [hidden]의 기본 display:none이 위 규칙에 밀리지 않도록 flex는 보이는 상태에서만 적용 */
+  .log-placeholder:not([hidden]) { display: flex; }
+
+  /* 슬라이드 미리보기: 안내 문구와 실제 슬라이드가 같은 자리(같은 박스)를 공유 */
+  #slideBox { position: relative; min-height: 140px; margin-top: 12px; }
+  #slidePlaceholder { position: absolute; inset: 0; }
+
+  .transcript-log-placeholder { color: var(--text-muted); }
+
+  /* 공유 컴포넌트(언어 콤보/기록창) 색을 새 팔레트에 맞춤 */
+  .lang-combo-input { border: 1px solid var(--card-border); border-radius: 8px; }
+  .lang-combo-list { border: 1px solid var(--card-border); border-radius: 8px; }
+  .lang-combo-item:hover, .lang-combo-item.active { background: var(--accent-bg); }
+  .transcript-line.final { color: var(--text); }
+  .transcript-line.interim { color: #8B95A8; }
+</style>
+</head>
+<body data-page="speaker">
+  <h1 data-i18n="speakerTitle">Speaker - Live Speech Recognition</h1>
+
+  <div class="card topbar">
+    <div class="topbar-info">
+      <input id="sessionNameInput" type="text" data-i18n-placeholder="sessionNamePlaceholder" placeholder="Enter a session name">
+      <div id="sessionDateTimeEl"></div>
+    </div>
+    <div class="topbar-actions">
+      <button id="sessionBtn" data-i18n="startSessionButton">Start Session</button>
+      <button id="endSessionBtn" data-i18n="endSessionButton" hidden>End Session</button>
+      <button id="logoutBtn" data-i18n="logoutButton">Logout</button>
+    </div>
+  </div>
+
+  <div id="status" data-i18n="sessionRequired">Please start a session first.</div>
+
+  <div class="dashboard-grid">
+    <div class="left-column">
+      <section class="card">
+        <h2 data-i18n="speakerCardTitle">Language &amp; Recording</h2>
+        <label data-i18n="uiLangSelectLabel">UI Language</label>
+        <div id="uiLangCombo"></div>
+        <button id="toggleBtn" class="mic-button" disabled title="Start Recording" aria-label="Start Recording">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/>
+            <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-3.08A7 7 0 0 0 19 11z"/>
+          </svg>
+        </button>
+        <div id="micStatus"></div>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="slidePreviewLabel">Slide Preview</h2>
+        <label data-i18n="materialUploadLabel">Presentation Material (optional, PDF/PPT/text)</label>
+        <input type="file" id="materialInput" accept=".pdf,.txt,.ppt,.pptx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint">
+        <button id="uploadBtn" data-i18n="uploadButton">Upload &amp; Analyze</button>
+        <div id="uploadStatus"></div>
+        <textarea id="materialSummary" rows="3" readonly hidden></textarea>
+
+        <div id="slideBox">
+          <div id="slidePlaceholder" class="log-placeholder" data-i18n="slidePlaceholder">Upload a presentation to see slides here.</div>
+          <div id="slidePreviewField" hidden>
+            <div id="slideViewer">
+              <button id="prevSlideBtn">&lt;</button>
+              <img id="slideImage" alt="slide preview">
+              <button id="nextSlideBtn">&gt;</button>
+            </div>
+            <div id="slideCounter"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" id="transcriptCard">
+      <h2 data-i18n="transcriptCardTitle">Live Recognition &amp; Translation</h2>
+      <div id="transcriptLog"></div>
+
+      <h3 data-i18n="translationPreviewLabel">Translation Preview</h3>
+      <div id="previewLangCombo"></div>
+      <div id="previewTranscriptLog"></div>
+    </section>
+
+    <section class="card" id="shareCard">
+      <h2 data-i18n="shareCardTitle">Share with Listeners</h2>
+      <div id="sharePlaceholder" data-i18n="sharePlaceholderText">Start a session to see the QR code and share link here.</div>
+
+      <div id="shareContent" hidden>
+        <img id="qrImage" alt="QR code">
+        <div><span data-i18n="sessionCodeLabel">Session Code</span></div>
+        <div id="sessionCode"></div>
+        <div id="joinUrlRow">
+          <input id="joinUrlInput" type="text" readonly>
+        </div>
+        <div id="listenerStats" data-i18n="noListeners">No listeners connected.</div>
+        <div id="shareButtons">
+          <button id="copyLinkBtn" data-i18n="copyLinkButton">Copy Link</button>
+          <button id="inviteBtn" data-i18n="inviteButton">Send Invite Message</button>
+          <span id="shareToast"></span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/shared.js"></script>
+  <script>
+    const toggleBtn = document.getElementById('toggleBtn');
+    const micStatusEl = document.getElementById('micStatus');
+    const statusEl = document.getElementById('status');
+    const transcriptLog = createTranscriptLog(document.getElementById('transcriptLog'), {
+      editable: true,
+      placeholderI18nKey: 'transcriptPlaceholder',
+      onEdit: (lineId, newText) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'editTranscript', lineId, transcript: newText }));
+        }
+      },
+    });
+    const uiLangComboEl = document.getElementById('uiLangCombo');
+    const materialInput = document.getElementById('materialInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadStatusEl = document.getElementById('uploadStatus');
+    const materialSummaryEl = document.getElementById('materialSummary');
+    const slidePreviewField = document.getElementById('slidePreviewField');
+    const slidePlaceholderEl = document.getElementById('slidePlaceholder');
+    const slideImageEl = document.getElementById('slideImage');
+    const slideCounterEl = document.getElementById('slideCounter');
+    const prevSlideBtn = document.getElementById('prevSlideBtn');
+    const nextSlideBtn = document.getElementById('nextSlideBtn');
+    const sessionNameInput = document.getElementById('sessionNameInput');
+    const sessionDateTimeEl = document.getElementById('sessionDateTimeEl');
+    const sessionBtn = document.getElementById('sessionBtn');
+    const endSessionBtn = document.getElementById('endSessionBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const sharePlaceholderEl = document.getElementById('sharePlaceholder');
+    const shareContentEl = document.getElementById('shareContent');
+    const qrImageEl = document.getElementById('qrImage');
+    const sessionCodeEl = document.getElementById('sessionCode');
+    const joinUrlInput = document.getElementById('joinUrlInput');
+    const copyLinkBtn = document.getElementById('copyLinkBtn');
+    const inviteBtn = document.getElementById('inviteBtn');
+    const shareToastEl = document.getElementById('shareToast');
+    const listenerStatsEl = document.getElementById('listenerStats');
+    const previewLangComboEl = document.getElementById('previewLangCombo');
+    const previewTranscriptLog = createTranscriptLog(document.getElementById('previewTranscriptLog'), {
+      placeholderI18nKey: 'previewPlaceholder',
+    });
+
+    let ws = null;
+    let mediaRecorder = null;
+    let mediaStream = null;
+    let recording = false;
+    let sessionCode = null;
+    let sessionStartedAt = null;
+    let slideCount = 0;
+    let currentSlideIndex = 0; // 0-based, 화자 화면에서만 쓰이는 로컬 상태
+    let previewLang = null;
+
+    let uiLang = 'en';
+    let uiStrings = {
+      startButton: 'Start Recording',
+      stopButton: 'Stop Recording',
+      statusIdle: 'Idle',
+      statusRecording: 'Recording...',
+      statusClosed: 'Connection closed.',
+      errorPrefix: 'Error',
+      unsupportedBrowser: 'This browser does not support microphone recording. Please use Chrome.',
+      searchPlaceholder: 'Search languages...',
+      noResults: 'No results',
+      uploadAnalyzing: 'Analyzing...',
+      uploadDone: 'Analysis complete',
+      uploadNoFile: 'Please choose a file.',
+      startSessionButton: 'Start Session',
+      endSessionButton: 'End Session',
+      copyLinkButton: 'Copy Link',
+      copyDone: 'Copied',
+      inviteButton: 'Send Invite Message',
+      linkCopiedToast: 'Link copied.',
+      messageCopiedToast: 'Invite message copied.',
+      inviteMessageIntro: "You're invited to a live interpretation session.",
+      inviteMessageInstruction: 'Open the link below and choose your language.',
+      inviteMessageCodeLabel: 'Session code',
+      inviteMessageStartLabel: 'Started at',
+      inviteMessageNamedSuffix: 'invites you to a session.',
+      listenerCountLabel: 'Listeners',
+      noListeners: 'No listeners connected.',
+      sessionRequired: 'Please start a session first.',
+      translationPreviewLabel: 'Translation Preview',
+      transcriptPlaceholder: 'Start a session to see live recognition results here.',
+      previewPlaceholder: 'Start a session and choose a language to see the translation preview here.',
+      slidePlaceholder: 'Upload a presentation to see slides here.',
+      sharePlaceholderText: 'Start a session to see the QR code and share link here.',
+    };
+
+    function refreshStatusText() {
+      if (!sessionCode) {
+        statusEl.textContent = uiStrings.sessionRequired;
+      } else if (!ws) {
+        statusEl.textContent = uiStrings.statusIdle;
+      } else if (recording) {
+        statusEl.textContent = uiStrings.statusRecording;
+      }
+      micStatusEl.textContent = statusEl.textContent;
+    }
+
+    function updateSlideView() {
+      if (slideCount === 0) {
+        slidePreviewField.hidden = true;
+        slidePlaceholderEl.hidden = false;
+        return;
+      }
+      slidePlaceholderEl.hidden = true;
+      slidePreviewField.hidden = false;
+      slideImageEl.src = `/api/sessions/${sessionCode}/slides/${currentSlideIndex + 1}`;
+      slideCounterEl.textContent = `${currentSlideIndex + 1} / ${slideCount}`;
+      prevSlideBtn.disabled = currentSlideIndex === 0;
+      nextSlideBtn.disabled = currentSlideIndex === slideCount - 1;
+    }
+
+    function goToPrevSlide() {
+      if (currentSlideIndex > 0) {
+        currentSlideIndex -= 1;
+        updateSlideView();
+      }
+    }
+
+    function goToNextSlide() {
+      if (currentSlideIndex < slideCount - 1) {
+        currentSlideIndex += 1;
+        updateSlideView();
+      }
+    }
+
+    prevSlideBtn.addEventListener('click', goToPrevSlide);
+    nextSlideBtn.addEventListener('click', goToNextSlide);
+
+    document.addEventListener('keydown', (e) => {
+      if (slideCount === 0) return;
+      const tag = document.activeElement ? document.activeElement.tagName : '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goToPrevSlide();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        goToNextSlide();
+      }
+    });
+
+    function renderListenerStats(stats) {
+      if (!stats || stats.total === 0) {
+        listenerStatsEl.textContent = uiStrings.noListeners;
+        return;
+      }
+      const byLangText = Object.entries(stats.byLang)
+        .map(([lang, count]) => `${lang}: ${count}`)
+        .join(', ');
+      listenerStatsEl.textContent = `${uiStrings.listenerCountLabel}: ${stats.total} (${byLangText})`;
+    }
+
+    function sendPreviewLang() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'setPreviewLang', lang: previewLang }));
+      }
+    }
+
+    const previewLangCombo = createLanguageCombobox(previewLangComboEl, (lang) => {
+      previewLang = lang.code;
+      previewTranscriptLog.clear();
+      sendPreviewLang();
+    });
+
+    // UI 언어를 실제로 적용하는 공통 로직 (콤보박스 수동 선택 / 브라우저 언어 자동 감지 양쪽에서 재사용)
+    async function applyUiLanguage(langCode, fallbackName) {
+      uiLangCombo.setEnabled(false);
+      try {
+        uiLang = langCode;
+        const [languages, strings] = await Promise.all([
+          fetchLanguages(uiLang),
+          fetchUiStrings(uiLang),
+        ]);
+        uiStrings = strings;
+
+        applyUiStrings(strings);
+        document.documentElement.lang = uiLang;
+        uiLangCombo.setPlaceholder(strings.searchPlaceholder);
+        uiLangCombo.setNoResultsText(strings.noResults);
+        uiLangCombo.setLanguages(languages);
+        previewLangCombo.setPlaceholder(strings.searchPlaceholder);
+        previewLangCombo.setNoResultsText(strings.noResults);
+        previewLangCombo.setLanguages(languages);
+
+        const localizedSelf = languages.find((l) => l.code === uiLang);
+        uiLangCombo.setDisplayValue(localizedSelf ? localizedSelf.name : (fallbackName || uiLang));
+
+        if (previewLang) {
+          const localizedPreview = languages.find((l) => l.code === previewLang);
+          if (localizedPreview) previewLangCombo.setDisplayValue(localizedPreview.name);
+        }
+
+        const micTitle = recording ? strings.stopButton : strings.startButton;
+        toggleBtn.title = micTitle;
+        toggleBtn.setAttribute('aria-label', micTitle);
+        refreshStatusText();
+      } catch (err) {
+        console.error('UI 언어 적용 실패:', err.message);
+      } finally {
+        uiLangCombo.setEnabled(true);
+      }
+    }
+
+    const uiLangCombo = createLanguageCombobox(uiLangComboEl, (lang) => applyUiLanguage(lang.code, lang.name));
+
+    // 최초 로드 시: 언어 목록은 영어 기준으로 먼저 채워두고, 브라우저 언어가 영어가 아니면 자동으로 그 언어를 적용
+    (async function initUiLanguage() {
+      try {
+        const languages = await fetchLanguages('en');
+        uiLangCombo.setLanguages(languages);
+        previewLangCombo.setLanguages(languages);
+      } catch (err) {
+        console.error('언어 목록 로드 실패:', err.message);
+      }
+
+      const browserLangCode = (navigator.language || 'en').split('-')[0].toLowerCase();
+
+      if (browserLangCode && browserLangCode !== 'en') {
+        await applyUiLanguage(browserLangCode);
+      } else {
+        uiLangCombo.setPlaceholder(uiStrings.searchPlaceholder);
+        uiLangCombo.setNoResultsText(uiStrings.noResults);
+        previewLangCombo.setPlaceholder(uiStrings.searchPlaceholder);
+        previewLangCombo.setNoResultsText(uiStrings.noResults);
+      }
+    })();
+
+    function formatSessionStart(date) {
+      if (!date) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    sessionBtn.addEventListener('click', async () => {
+      sessionBtn.disabled = true;
+      try {
+        const res = await fetch('/api/sessions', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        sessionCode = data.code;
+        sessionStartedAt = new Date();
+        sessionDateTimeEl.textContent = formatSessionStart(sessionStartedAt);
+        sessionCodeEl.textContent = sessionCode;
+        joinUrlInput.value = data.joinUrl;
+        qrImageEl.src = data.qrCodeDataUrl;
+
+        sharePlaceholderEl.hidden = true;
+        shareContentEl.hidden = false;
+        sessionBtn.hidden = true;
+        endSessionBtn.hidden = false;
+
+        toggleBtn.disabled = false;
+        renderListenerStats(null);
+        refreshStatusText();
+      } catch (err) {
+        statusEl.textContent = `${uiStrings.errorPrefix}: ${err.message}`;
+        sessionBtn.disabled = false;
+      }
+    });
+
+    endSessionBtn.addEventListener('click', async () => {
+      if (recording) stopRecording();
+
+      if (sessionCode) {
+        try {
+          await fetch(`/api/sessions/${sessionCode}`, { method: 'DELETE' });
+        } catch (err) {
+          console.error('세션 종료 요청 실패:', err.message);
+        }
+      }
+
+      sessionCode = null;
+      sessionStartedAt = null;
+      sessionDateTimeEl.textContent = '';
+      sharePlaceholderEl.hidden = false;
+      shareContentEl.hidden = true;
+      sessionBtn.hidden = false;
+      sessionBtn.disabled = false;
+      endSessionBtn.hidden = true;
+      toggleBtn.disabled = true;
+
+      slideCount = 0;
+      currentSlideIndex = 0;
+      updateSlideView();
+      transcriptLog.clear();
+      previewTranscriptLog.clear();
+      refreshStatusText();
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+      logoutBtn.disabled = true;
+      try {
+        await fetch('/api/logout', { method: 'POST' });
+      } catch (err) {
+        console.error('로그아웃 요청 실패:', err.message);
+      }
+      location.href = '/speaker-login.html';
+    });
+
+    let shareToastTimer = null;
+    function showShareToast(text) {
+      shareToastEl.textContent = text;
+      shareToastEl.classList.add('visible');
+      if (shareToastTimer) clearTimeout(shareToastTimer);
+      shareToastTimer = setTimeout(() => {
+        shareToastEl.classList.remove('visible');
+      }, 2000);
+    }
+
+    function buildInviteMessage() {
+      const name = sessionNameInput.value.trim();
+      const intro = name ? `${name} ${uiStrings.inviteMessageNamedSuffix}` : uiStrings.inviteMessageIntro;
+      return [
+        intro,
+        uiStrings.inviteMessageInstruction,
+        '',
+        joinUrlInput.value,
+        '',
+        `${uiStrings.inviteMessageCodeLabel}: ${sessionCode}`,
+        `${uiStrings.inviteMessageStartLabel}: ${formatSessionStart(sessionStartedAt)}`,
+      ].join('\n');
+    }
+
+    copyLinkBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(joinUrlInput.value);
+        showShareToast(uiStrings.linkCopiedToast);
+      } catch (err) {
+        joinUrlInput.select();
+      }
+    });
+
+    inviteBtn.addEventListener('click', async () => {
+      if (!sessionCode) return;
+      try {
+        await navigator.clipboard.writeText(buildInviteMessage());
+        showShareToast(uiStrings.messageCopiedToast);
+      } catch (err) {
+        console.error('초대 메시지 복사 실패:', err.message);
+      }
+    });
+
+    async function startRecording() {
+      if (!sessionCode) {
+        statusEl.textContent = uiStrings.sessionRequired;
+        return;
+      }
+
+      if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        statusEl.textContent = uiStrings.unsupportedBrowser;
+        return;
+      }
+
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${location.host}?role=speaker&session=${sessionCode}`);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        statusEl.textContent = uiStrings.statusRecording;
+        micStatusEl.textContent = uiStrings.statusRecording;
+        sendPreviewLang();
+
+        mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm;codecs=opus' });
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+            ws.send(event.data);
+          }
+        };
+
+        mediaRecorder.start(250);
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'error') {
+          statusEl.textContent = `${uiStrings.errorPrefix}: ${data.message}`;
+          return;
+        }
+
+        if (data.type === 'transcript') {
+          if (data.isFinal) {
+            transcriptLog.commitFinal(data.transcript, data.lineId);
+          } else {
+            transcriptLog.updateInterim(data.transcript);
+          }
+          return;
+        }
+
+        if (data.type === 'listenerStats') {
+          renderListenerStats(data);
+          return;
+        }
+
+        if (data.type === 'previewTranslation') {
+          if (data.isFinal) {
+            // 같은 lineId로 다시 오면(수정 재번역) 자리를 유지한 채 내용만 교체, 처음 보는 lineId면 새 줄로 추가
+            const replaced = data.lineId && previewTranscriptLog.replaceFinal(data.lineId, data.translation);
+            if (!replaced) previewTranscriptLog.commitFinal(data.translation, data.lineId);
+          } else {
+            previewTranscriptLog.updateInterim(data.translation);
+          }
+        }
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = recording ? uiStrings.statusClosed : uiStrings.statusIdle;
+        micStatusEl.textContent = statusEl.textContent;
+      };
+
+      recording = true;
+      toggleBtn.classList.add('recording');
+      toggleBtn.title = uiStrings.stopButton;
+      toggleBtn.setAttribute('aria-label', uiStrings.stopButton);
+    }
+
+    function stopRecording() {
+      recording = false;
+
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+      }
+      if (ws) {
+        ws.close();
+      }
+      ws = null;
+
+      toggleBtn.classList.remove('recording');
+      toggleBtn.title = uiStrings.startButton;
+      toggleBtn.setAttribute('aria-label', uiStrings.startButton);
+      refreshStatusText();
+      transcriptLog.updateInterim('');
+      previewTranscriptLog.updateInterim('');
+    }
+
+    toggleBtn.addEventListener('click', () => {
+      if (recording) {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+    });
+
+    uploadBtn.addEventListener('click', async () => {
+      if (!sessionCode) {
+        uploadStatusEl.textContent = uiStrings.sessionRequired;
+        return;
+      }
+
+      const file = materialInput.files[0];
+      if (!file) {
+        uploadStatusEl.textContent = uiStrings.uploadNoFile;
+        return;
+      }
+
+      uploadBtn.disabled = true;
+      uploadStatusEl.textContent = uiStrings.uploadAnalyzing;
+      materialSummaryEl.hidden = true;
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch(`/api/sessions/${sessionCode}/upload-material`, {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        uploadStatusEl.textContent = `${uiStrings.uploadDone}: ${data.fileName} (${data.termCount})`;
+        if (data.summary) {
+          materialSummaryEl.value = data.summary;
+          materialSummaryEl.hidden = false;
+        }
+
+        slideCount = data.slideCount || 0;
+        currentSlideIndex = 0;
+        updateSlideView();
+      } catch (err) {
+        uploadStatusEl.textContent = `${uiStrings.errorPrefix}: ${err.message}`;
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

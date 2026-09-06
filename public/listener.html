@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Listener - Live Subtitles</title>
+<link rel="stylesheet" href="/shared.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F9FC;
+    --primary: #2F6FED;
+    --card-bg: #FFFFFF;
+    --card-border: #E2E8F0;
+    --accent-bg: #EAF1FF;
+    --text: #0F1B33;
+    --text-muted: #64748B;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    box-sizing: border-box;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 16px 16px 20px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* 상단 워드마크 */
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--primary);
+    margin-bottom: 14px;
+    flex: 0 0 auto;
+  }
+  .brand-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--primary);
+    flex: 0 0 auto;
+  }
+
+  label {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  /* 세션 코드 입력 (링크 없이 직접 들어온 경우에만 표시) */
+  #joinField { margin-bottom: 14px; flex: 0 0 auto; }
+  #joinPanel { display: flex; gap: 8px; }
+  #joinPanel input {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 11px 12px;
+    font-size: 16px;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    text-transform: uppercase;
+    font-family: 'Inter', sans-serif;
+  }
+  #joinBtn {
+    flex: 0 0 auto;
+    background: var(--primary);
+    color: #fff;
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    padding: 11px 18px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+  }
+  #joinBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* 언어 검색+선택: 화면 폭을 꽉 채우고 한 줄 높이만 차지 */
+  #langField { margin-bottom: 6px; flex: 0 0 auto; }
+  #langField .lang-combo { max-width: none; width: 100%; }
+  .lang-combo-input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 16px;
+    font-family: 'Inter', sans-serif;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    background: var(--card-bg);
+  }
+  .lang-combo-list {
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+  .lang-combo-item:hover, .lang-combo-item.active { background: var(--accent-bg); }
+
+  /* 연결 상태: 작은 회색 텍스트 */
+  #status {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0 0 16px;
+    flex: 0 0 auto;
+  }
+
+  /* 자막 카드: 화면 대부분을 차지, 가운데 정렬된 폭 안에서 크게 */
+  #transcriptLog {
+    flex: 1;
+    min-height: 240px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    overflow-y: auto;
+    line-height: 1.5;
+  }
+
+  .transcript-line { margin-bottom: 12px; }
+
+  /* 잠정(번역 중) 문장: 회색, 카드 맨 아래 실시간 갱신 */
+  .transcript-line.interim {
+    color: #94A3B8;
+    font-size: 17px;
+    font-weight: 400;
+  }
+
+  /* 확정된 지난 문장들: 한 단계 작은 크기, 회색 톤 */
+  .transcript-line.final {
+    color: var(--text-muted);
+    font-size: 17px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  /* 가장 최근 확정 문장: 크고 진하게 강조 */
+  .transcript-line.final.latest {
+    color: var(--text);
+    font-size: 27px;
+    font-weight: 500;
+    line-height: 1.35;
+  }
+</style>
+</head>
+<body data-page="listener">
+  <div class="brand"><span class="brand-dot"></span>WIN TRANS</div>
+
+  <div id="joinField">
+    <label data-i18n="joinSessionLabel">Enter Session Code</label>
+    <div id="joinPanel">
+      <input id="joinCodeInput" type="text" maxlength="6" placeholder="AB12CD">
+      <button id="joinBtn" data-i18n="joinButton">Join</button>
+    </div>
+  </div>
+
+  <div id="langField">
+    <label data-i18n="langSelectLabel">Select Language</label>
+    <div id="langCombo"></div>
+  </div>
+
+  <div id="status" data-i18n="joinInstructions">Enter a session code and select a language, then press Join.</div>
+
+  <div id="transcriptLog"></div>
+
+  <script src="/shared.js"></script>
+  <script>
+    const statusEl = document.getElementById('status');
+    const transcriptLog = createTranscriptLog(document.getElementById('transcriptLog'));
+    const joinCodeInput = document.getElementById('joinCodeInput');
+    const joinBtn = document.getElementById('joinBtn');
+    const langComboEl = document.getElementById('langCombo');
+
+    let ws = null;
+    let currentLangCode = null;
+    let sessionCode = null;
+    let selectedLang = null;
+
+    let uiStrings = {
+      statusSelectPrompt: 'Select a language to connect.',
+      statusConnected: 'Connected',
+      statusClosed: 'Connection closed.',
+      searchPlaceholder: 'Search languages...',
+      noResults: 'No results',
+      sessionNotFound: 'Session not found. Please check the code.',
+      validatingSession: 'Checking session...',
+      joinButton: 'Join',
+      joinInstructions: 'Enter a session code and select a language, then press Join.',
+      selectLanguageFirst: 'Please select a language first.',
+      enterSessionCodeFirst: 'Please enter a session code.',
+    };
+
+    function connect(lang) {
+      if (ws) {
+        ws.close();
+      }
+
+      currentLangCode = lang.code;
+
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(
+        `${protocol}//${location.host}?role=listener&session=${encodeURIComponent(sessionCode)}&lang=${encodeURIComponent(lang.code)}`
+      );
+
+      ws.onopen = () => {
+        statusEl.textContent = `${uiStrings.statusConnected}: ${lang.name}`;
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'subtitle') {
+          if (data.isFinal) {
+            // 같은 lineId로 다시 오면(화자가 원문을 수정해 재번역된 경우) 자리를 유지한 채 내용만 교체
+            const replaced = data.lineId && transcriptLog.replaceFinal(data.lineId, data.translation);
+            if (!replaced) transcriptLog.commitFinal(data.translation, data.lineId);
+          } else {
+            transcriptLog.updateInterim(data.translation);
+          }
+          return;
+        }
+
+        if (data.type === 'sessionEnded') {
+          statusEl.textContent = uiStrings.statusClosed;
+          return;
+        }
+
+        if (data.type === 'error') {
+          statusEl.textContent = `${uiStrings.errorPrefix || 'Error'}: ${data.message}`;
+        }
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = uiStrings.statusClosed;
+      };
+    }
+
+    // UI 언어를 실제로 적용하는 공통 로직 (콤보박스 수동 선택 / 브라우저 언어 자동 감지 양쪽에서 재사용)
+    async function applyUiLanguage(langCode, fallbackName) {
+      langCombo.setEnabled(false);
+      try {
+        const [languages, strings] = await Promise.all([
+          fetchLanguages(langCode),
+          fetchUiStrings(langCode),
+        ]);
+        uiStrings = strings;
+
+        applyUiStrings(strings);
+        document.documentElement.lang = langCode;
+        langCombo.setPlaceholder(strings.searchPlaceholder);
+        langCombo.setNoResultsText(strings.noResults);
+        langCombo.setLanguages(languages);
+
+        if (selectedLang) {
+          const localizedSelf = languages.find((l) => l.code === selectedLang.code);
+          const displayName = localizedSelf ? localizedSelf.name : (fallbackName || selectedLang.name);
+          langCombo.setDisplayValue(displayName);
+          selectedLang = { code: selectedLang.code, name: displayName };
+
+          if (ws && ws.readyState === WebSocket.OPEN && currentLangCode === selectedLang.code) {
+            statusEl.textContent = `${strings.statusConnected}: ${displayName}`;
+          }
+        }
+      } catch (err) {
+        console.error('UI 언어 적용 실패:', err.message);
+      } finally {
+        langCombo.setEnabled(true);
+      }
+    }
+
+    const langCombo = createLanguageCombobox(langComboEl, (lang) => {
+      selectedLang = lang;
+
+      // 이미 접속 중이면 언어 변경 시 바로 그 언어로 재연결 (실시간 언어 전환)
+      const alreadyConnected = ws && ws.readyState === WebSocket.OPEN && sessionCode;
+      if (alreadyConnected) {
+        connect(lang);
+      }
+
+      applyUiLanguage(lang.code, lang.name);
+    });
+
+    // 최초 로드 시: 언어 목록은 영어 기준으로 먼저 채워두고, 브라우저 언어가 영어가 아니면 자동으로 그 언어를 적용
+    (async function initUiLanguage() {
+      try {
+        const languages = await fetchLanguages('en');
+        langCombo.setLanguages(languages);
+        langCombo.setPlaceholder(uiStrings.searchPlaceholder);
+        langCombo.setNoResultsText(uiStrings.noResults);
+      } catch (err) {
+        console.error('언어 목록 로드 실패:', err.message);
+      }
+
+      const browserLangCode = (navigator.language || 'en').split('-')[0].toLowerCase();
+      if (browserLangCode && browserLangCode !== 'en') {
+        await applyUiLanguage(browserLangCode);
+      }
+    })();
+
+    async function handleJoin() {
+      const normalized = joinCodeInput.value.trim().toUpperCase();
+      if (!normalized) {
+        statusEl.textContent = uiStrings.enterSessionCodeFirst;
+        return;
+      }
+      if (!selectedLang) {
+        statusEl.textContent = uiStrings.selectLanguageFirst;
+        return;
+      }
+
+      joinBtn.disabled = true;
+      statusEl.textContent = uiStrings.validatingSession;
+
+      try {
+        const res = await fetch(`/api/sessions/${normalized}`);
+        if (!res.ok) throw new Error(uiStrings.sessionNotFound);
+
+        sessionCode = normalized;
+        connect(selectedLang);
+      } catch (err) {
+        statusEl.textContent = uiStrings.sessionNotFound;
+      } finally {
+        joinBtn.disabled = false;
+      }
+    }
+
+    joinBtn.addEventListener('click', handleJoin);
+    joinCodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleJoin();
+    });
+
+    (function initFromUrl() {
+      const params = new URLSearchParams(location.search);
+      const codeFromUrl = params.get('session');
+      if (codeFromUrl) {
+        joinCodeInput.value = codeFromUrl.toUpperCase();
+      }
+    })();
+  </script>
+</body>
+</html>
