@@ -133,6 +133,17 @@ const UI_STRINGS_KO = {
   selectLanguageFirst: '언어를 먼저 선택해주세요.',
   enterSessionCodeFirst: '세션 코드를 입력해주세요.',
   logoutButton: '로그아웃',
+  keywordCardTitle: '핵심 단어',
+  keywordInputPlaceholder: '핵심 단어 입력 후 Enter 또는 쉼표',
+  keywordMaxReached: '최대 10개까지 입력할 수 있습니다.',
+  keywordSearchButton: '관련어·후보 검색',
+  keywordSearching: '검색 중...',
+  keywordRelatedLabel: '관련어 (자동 포함)',
+  keywordCandidatesLabel: '관련 고유명사 후보 (선택해서 추가)',
+  keywordNoCandidates: '추천할 후보를 찾지 못했습니다.',
+  keywordUnavailable: 'ANTHROPIC_API_KEY가 설정되지 않아 이 기능을 사용할 수 없습니다.',
+  keywordStatusApplied: '핵심 단어 및 관련어 총 {count}개 적용됨',
+  keywordEmptyHint: '핵심 단어를 입력하면 STT 인식 정확도를 높일 수 있습니다 (선택).',
 };
 
 const UI_KEYS = Object.keys(UI_STRINGS_KO);
@@ -318,6 +329,80 @@ ${truncated}`;
   };
 }
 
+// ===== 핵심 단어 입력 → AI 관련어 확장 / 웹 검색 기반 고유명사 후보 =====
+const MAX_KEYWORDS = 10;
+// 발표 전 준비 단계에서 한 번만 호출되는 기능이라(실시간 STT 교정처럼 지연에 민감하지 않음)
+// 더 강력한 모델을 사용
+const KEYWORD_MODEL = 'claude-opus-5';
+
+function parseJsonArrayResponse(text) {
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  const parsed = JSON.parse(cleaned);
+  if (!Array.isArray(parsed)) throw new Error('배열 형식이 아닙니다.');
+  return parsed.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim());
+}
+
+// 입력된 단어들과 발음이 비슷하거나 STT에서 혼동되기 쉬운 관련 표현을 확장 (웹 검색 없이 순수 언어 지식)
+async function expandRelatedTerms(keywords) {
+  if (!anthropicClient) return [];
+
+  const prompt = `다음은 발표자가 실시간 음성인식(STT) 정확도를 높이려고 미리 등록하려는 핵심 단어/구입니다:
+${keywords.map((k) => `- ${k}`).join('\n')}
+
+이 단어들과 발음이 비슷하거나 실시간 음성인식이 혼동하기 쉬운 관련 표현, 그리고 의미상 밀접하게 연관된 변형 표현을 확장해서 제안해주세요.
+예: '글로컬' -> '글로벌', '로컬'
+
+아래 JSON 배열 형식으로만 답변하세요 (설명이나 마크다운 코드블록 없이 순수 JSON만, 최대 20개):
+["관련어1", "관련어2"]`;
+
+  const message = await anthropicClient.messages.create({
+    model: KEYWORD_MODEL,
+    max_tokens: 1024,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const textBlock = message.content.find((block) => block.type === 'text');
+  if (!textBlock) return [];
+  return parseJsonArrayResponse(textBlock.text).slice(0, 20);
+}
+
+// 입력된 단어를 웹에서 검색해서 관련된 정확한 고유명사(공식 기관명, 영문 표기, 관련 인물/부서명 등) 후보를 제안
+async function searchProperNounCandidates(keywords) {
+  if (!anthropicClient) return [];
+
+  const userQuery = `다음은 발표자가 언급할 예정인 핵심 단어/구입니다:
+${keywords.map((k) => `- ${k}`).join('\n')}
+
+이 단어들과 관련된 정확한 고유명사(공식 기관명, 정확한 영문 표기, 관련 인물명, 부서명 등)를 웹에서 검색해서 5~10개 후보로 제안해주세요.
+그 지역의 일반 상점, 편의시설, 발표 내용과 무관해 보이는 단어는 제외하세요.
+
+검색과 판단이 끝나면, 다른 설명 없이 아래 JSON 배열 형식으로만 최종 답변하세요:
+["후보1", "후보2"]`;
+
+  let messages = [{ role: 'user', content: userQuery }];
+  const tools = [{ type: 'web_search_20260209', name: 'web_search' }];
+  let message;
+
+  // 서버 측 웹 검색 루프가 기본 10회 반복 제한에 걸리면 pause_turn으로 멈추는데,
+  // 대화 이력을 그대로 다시 보내면 서버가 이어서 진행한다 (최대 몇 번만 재시도)
+  for (let i = 0; i < 3; i += 1) {
+    message = await anthropicClient.messages.create({
+      model: KEYWORD_MODEL,
+      max_tokens: 2000,
+      tools,
+      messages,
+    });
+
+    if (message.stop_reason !== 'pause_turn') break;
+    messages = [...messages, { role: 'assistant', content: message.content }];
+  }
+
+  const textBlocks = message.content.filter((block) => block.type === 'text');
+  if (textBlocks.length === 0) return [];
+  const finalText = textBlocks[textBlocks.length - 1].text;
+  return parseJsonArrayResponse(finalText).slice(0, 10);
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
@@ -357,13 +442,14 @@ function generateSessionCode() {
   return code;
 }
 
-function createSession(code) {
+function createSession(code, keywordTerms = []) {
   return {
     code,
     speakerWs: null,
     recognizeStream: null,
     listeners: new Map(), // ws -> lang
     presentationContext: null, // { fileName, terms, summary, analyzedAt }
+    keywordTerms, // 화자가 세션 시작 전 입력한 핵심 단어 + AI 확장 관련어 + 선택한 웹 검색 후보 (중복 제거됨)
     slideImages: [], // Buffer[] (PNG), 화자 화면 전용 슬라이드 미리보기
     previewLang: null, // 화자 화면의 번역 미리보기 언어
     createdAt: Date.now(),
@@ -473,16 +559,51 @@ app.get('/api/ui-strings', async (req, res) => {
   }
 });
 
+app.post('/api/keyword-suggestions', async (req, res) => {
+  if (!anthropicClient) {
+    res.status(503).json({ error: 'ANTHROPIC_API_KEY가 설정되지 않아 이 기능을 사용할 수 없습니다.' });
+    return;
+  }
+
+  const keywords = Array.isArray(req.body?.keywords)
+    ? req.body.keywords
+        .filter((k) => typeof k === 'string' && k.trim())
+        .map((k) => k.trim())
+        .slice(0, MAX_KEYWORDS)
+    : [];
+
+  if (keywords.length === 0) {
+    res.status(400).json({ error: '핵심 단어를 하나 이상 입력해주세요.' });
+    return;
+  }
+
+  try {
+    const [relatedTerms, searchCandidates] = await Promise.all([
+      expandRelatedTerms(keywords),
+      searchProperNounCandidates(keywords),
+    ]);
+    res.json({ relatedTerms, searchCandidates });
+  } catch (err) {
+    console.error('핵심 단어 확장/검색 오류:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/sessions', async (req, res) => {
   const code = generateSessionCode();
-  sessions.set(code, createSession(code));
+
+  const keywordTerms = Array.isArray(req.body?.keywords)
+    ? [...new Set(req.body.keywords.filter((k) => typeof k === 'string' && k.trim()).map((k) => k.trim()))]
+    : [];
+
+  sessions.set(code, createSession(code, keywordTerms));
 
   const joinUrl = `${req.protocol}://${req.get('host')}/listener.html?session=${code}`;
 
   try {
     const qrCodeDataUrl = await QRCode.toDataURL(joinUrl, { margin: 1, width: 240 });
-    console.log(`세션 생성: ${code}`);
-    res.json({ code, joinUrl, qrCodeDataUrl });
+    console.log(`세션 생성: ${code}` + (keywordTerms.length > 0 ? ` (핵심 단어 ${keywordTerms.length}개)` : ''));
+    res.json({ code, joinUrl, qrCodeDataUrl, keywordCount: keywordTerms.length });
   } catch (err) {
     console.error('QR 코드 생성 오류:', err.message);
     res.status(500).json({ error: err.message });
@@ -636,10 +757,15 @@ function startRecognizeStream(ws, session) {
     languageCode: STT_LANGUAGE_CODE,
   };
 
-  // 발표 자료에서 추출한 핵심 용어를 STT 힌트로 등록해 인식 정확도를 높임
-  if (session.presentationContext && session.presentationContext.terms.length > 0) {
+  // 발표 자료에서 추출한 핵심 용어 + 화자가 세션 시작 전 등록한 핵심 단어(및 AI 확장/웹 검색 후보)를
+  // 합쳐서 STT 힌트로 등록해 인식 정확도를 높임 (중복 제거)
+  const allPhraseHints = new Set([
+    ...(session.presentationContext ? session.presentationContext.terms : []),
+    ...(session.keywordTerms || []),
+  ]);
+  if (allPhraseHints.size > 0) {
     speechConfig.speechContexts = [
-      { phrases: session.presentationContext.terms, boost: SPEECH_CONTEXT_BOOST },
+      { phrases: Array.from(allPhraseHints), boost: SPEECH_CONTEXT_BOOST },
     ];
   }
 

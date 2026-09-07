@@ -152,6 +152,64 @@
   }
   #micStatus { text-align: center; font-size: 13px; color: var(--text-muted); }
 
+  /* 카드 ①.5 핵심 단어 */
+  #keywordTagsWrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 8px;
+  }
+  .keyword-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--accent-bg);
+    color: var(--primary);
+    border-radius: 999px;
+    padding: 4px 6px 4px 10px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .keyword-tag button {
+    background: none;
+    border: none;
+    padding: 0 2px;
+    margin: 0;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+  }
+  #keywordInput {
+    flex: 1;
+    min-width: 140px;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    padding: 4px;
+    background: transparent;
+  }
+  .keyword-hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  #keywordSearchBtn { width: 100%; margin-top: 10px; }
+  #keywordSuggestions { margin-top: 12px; }
+  #keywordRelatedSection, #keywordCandidatesSection { margin-top: 10px; }
+  #keywordRelatedTags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .keyword-related-tag {
+    background: #F1F5F9;
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  #keywordCandidateList { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+  .keyword-candidate-item { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+  .keyword-candidate-item input { margin: 0; }
+
   /* 카드 ② 슬라이드 미리보기 */
   #uploadStatus { margin-top: 8px; font-size: 13px; color: var(--text-muted); }
   #materialSummary {
@@ -283,6 +341,29 @@
         <div id="micStatus"></div>
       </section>
 
+      <section class="card" id="keywordCard">
+        <h2 data-i18n="keywordCardTitle">Key Terms</h2>
+        <div id="keywordTagsWrap">
+          <div id="keywordTags"></div>
+          <input type="text" id="keywordInput" data-i18n-placeholder="keywordInputPlaceholder" placeholder="Enter a key term, then press Enter or comma">
+        </div>
+        <div id="keywordMaxMsg" class="keyword-hint" hidden data-i18n="keywordMaxReached">You can add up to 10 terms.</div>
+        <button id="keywordSearchBtn" type="button" data-i18n="keywordSearchButton" disabled>Find related terms &amp; candidates</button>
+
+        <div id="keywordSuggestions" hidden>
+          <div id="keywordRelatedSection" hidden>
+            <label data-i18n="keywordRelatedLabel">Related terms (auto-included)</label>
+            <div id="keywordRelatedTags"></div>
+          </div>
+          <div id="keywordCandidatesSection" hidden>
+            <label data-i18n="keywordCandidatesLabel">Related proper-noun candidates (select to add)</label>
+            <div id="keywordCandidateList"></div>
+          </div>
+        </div>
+
+        <div id="keywordStatus" class="keyword-hint" data-i18n="keywordEmptyHint">Optionally add key terms to improve STT accuracy.</div>
+      </section>
+
       <section class="card">
         <h2 data-i18n="slidePreviewLabel">Slide Preview</h2>
         <label data-i18n="materialUploadLabel">Presentation Material (optional, PDF/PPT/text)</label>
@@ -379,6 +460,17 @@
       placeholderI18nKey: 'previewPlaceholder',
     });
 
+    const keywordInput = document.getElementById('keywordInput');
+    const keywordTagsEl = document.getElementById('keywordTags');
+    const keywordMaxMsgEl = document.getElementById('keywordMaxMsg');
+    const keywordSearchBtn = document.getElementById('keywordSearchBtn');
+    const keywordSuggestionsEl = document.getElementById('keywordSuggestions');
+    const keywordRelatedSectionEl = document.getElementById('keywordRelatedSection');
+    const keywordRelatedTagsEl = document.getElementById('keywordRelatedTags');
+    const keywordCandidatesSectionEl = document.getElementById('keywordCandidatesSection');
+    const keywordCandidateListEl = document.getElementById('keywordCandidateList');
+    const keywordStatusEl = document.getElementById('keywordStatus');
+
     let ws = null;
     let mediaRecorder = null;
     let mediaStream = null;
@@ -388,6 +480,11 @@
     let slideCount = 0;
     let currentSlideIndex = 0; // 0-based, 화자 화면에서만 쓰이는 로컬 상태
     let previewLang = null;
+
+    const MAX_KEYWORDS = 10;
+    let keywordList = []; // 화자가 직접 입력한 핵심 단어 (최대 10개)
+    let keywordRelatedTerms = []; // AI가 확장한 관련어 (자동 포함, 선택 불필요)
+    let keywordCandidates = []; // [{ term, checked }] 웹 검색 기반 고유명사 후보
 
     let uiLang = 'en';
     let uiStrings = {
@@ -423,6 +520,14 @@
       previewPlaceholder: 'Start a session and choose a language to see the translation preview here.',
       slidePlaceholder: 'Upload a presentation to see slides here.',
       sharePlaceholderText: 'Start a session to see the QR code and share link here.',
+      keywordMaxReached: 'You can add up to 10 terms.',
+      keywordSearchButton: 'Find related terms & candidates',
+      keywordSearching: 'Searching...',
+      keywordRelatedLabel: 'Related terms (auto-included)',
+      keywordCandidatesLabel: 'Related proper-noun candidates (select to add)',
+      keywordUnavailable: 'This feature is unavailable because ANTHROPIC_API_KEY is not set.',
+      keywordStatusApplied: 'Applied {count} key terms & related terms in total',
+      keywordEmptyHint: 'Optionally add key terms to improve STT accuracy.',
     };
 
     function refreshStatusText() {
@@ -434,6 +539,128 @@
         statusEl.textContent = uiStrings.statusRecording;
       }
       micStatusEl.textContent = statusEl.textContent;
+    }
+
+    // ===== 핵심 단어 (세션 시작 전 STT 정확도 향상용) =====
+    function renderKeywordTags() {
+      keywordTagsEl.innerHTML = '';
+      keywordList.forEach((word, index) => {
+        const tag = document.createElement('span');
+        tag.className = 'keyword-tag';
+        tag.textContent = word;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = '×';
+        removeBtn.setAttribute('aria-label', 'remove');
+        removeBtn.addEventListener('click', () => {
+          keywordList.splice(index, 1);
+          renderKeywordTags();
+        });
+        tag.appendChild(removeBtn);
+        keywordTagsEl.appendChild(tag);
+      });
+
+      const reachedMax = keywordList.length >= MAX_KEYWORDS;
+      keywordMaxMsgEl.hidden = !reachedMax;
+      keywordInput.hidden = reachedMax;
+      keywordSearchBtn.disabled = keywordList.length === 0;
+    }
+
+    function addKeyword(rawValue) {
+      const word = rawValue.trim();
+      if (!word || keywordList.length >= MAX_KEYWORDS || keywordList.includes(word)) return;
+      keywordList.push(word);
+      renderKeywordTags();
+    }
+
+    keywordInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        addKeyword(keywordInput.value.replace(/,$/, ''));
+        keywordInput.value = '';
+      }
+    });
+
+    function renderKeywordSuggestions() {
+      const hasRelated = keywordRelatedTerms.length > 0;
+      const hasCandidates = keywordCandidates.length > 0;
+      keywordSuggestionsEl.hidden = !hasRelated && !hasCandidates;
+
+      keywordRelatedSectionEl.hidden = !hasRelated;
+      keywordRelatedTagsEl.innerHTML = '';
+      keywordRelatedTerms.forEach((term) => {
+        const tag = document.createElement('span');
+        tag.className = 'keyword-related-tag';
+        tag.textContent = term;
+        keywordRelatedTagsEl.appendChild(tag);
+      });
+
+      keywordCandidatesSectionEl.hidden = !hasCandidates;
+      keywordCandidateListEl.innerHTML = '';
+      keywordCandidates.forEach((item, index) => {
+        const label = document.createElement('label');
+        label.className = 'keyword-candidate-item';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = item.checked;
+        checkbox.addEventListener('change', () => {
+          keywordCandidates[index].checked = checkbox.checked;
+        });
+
+        const span = document.createElement('span');
+        span.textContent = item.term;
+
+        label.appendChild(checkbox);
+        label.appendChild(span);
+        keywordCandidateListEl.appendChild(label);
+      });
+    }
+
+    keywordSearchBtn.addEventListener('click', async () => {
+      if (keywordList.length === 0) return;
+
+      keywordSearchBtn.disabled = true;
+      const originalLabel = keywordSearchBtn.textContent;
+      keywordSearchBtn.textContent = uiStrings.keywordSearching;
+
+      try {
+        const res = await fetch('/api/keyword-suggestions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keywords: keywordList }),
+        });
+        const data = await res.json();
+        if (res.status === 503) throw new Error(uiStrings.keywordUnavailable);
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        keywordRelatedTerms = data.relatedTerms || [];
+        keywordCandidates = (data.searchCandidates || []).map((term) => ({ term, checked: false }));
+        renderKeywordSuggestions();
+      } catch (err) {
+        keywordStatusEl.textContent = `${uiStrings.errorPrefix}: ${err.message}`;
+      } finally {
+        keywordSearchBtn.disabled = keywordList.length === 0;
+        keywordSearchBtn.textContent = originalLabel;
+      }
+    });
+
+    // 직접 입력 + AI 확장 관련어 + 화자가 체크한 웹 검색 후보를 합쳐 중복 제거
+    function getFinalKeywordTerms() {
+      const selectedCandidates = keywordCandidates.filter((c) => c.checked).map((c) => c.term);
+      return Array.from(new Set([...keywordList, ...keywordRelatedTerms, ...selectedCandidates]));
+    }
+
+    function showKeywordAppliedStatus(count) {
+      keywordStatusEl.textContent = uiStrings.keywordStatusApplied.replace('{count}', count);
+    }
+
+    function lockKeywordCard() {
+      keywordInput.disabled = true;
+      keywordSearchBtn.disabled = true;
+      keywordTagsEl.querySelectorAll('button').forEach((btn) => (btn.disabled = true));
+      keywordCandidateListEl.querySelectorAll('input').forEach((input) => (input.disabled = true));
     }
 
     function updateSlideView() {
@@ -576,7 +803,11 @@
     sessionBtn.addEventListener('click', async () => {
       sessionBtn.disabled = true;
       try {
-        const res = await fetch('/api/sessions', { method: 'POST' });
+        const res = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keywords: getFinalKeywordTerms() }),
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
@@ -595,6 +826,9 @@
         toggleBtn.disabled = false;
         renderListenerStats(null);
         refreshStatusText();
+
+        if (data.keywordCount > 0) showKeywordAppliedStatus(data.keywordCount);
+        lockKeywordCard();
       } catch (err) {
         statusEl.textContent = `${uiStrings.errorPrefix}: ${err.message}`;
         sessionBtn.disabled = false;
@@ -628,6 +862,15 @@
       transcriptLog.clear();
       previewTranscriptLog.clear();
       refreshStatusText();
+
+      keywordList = [];
+      keywordRelatedTerms = [];
+      keywordCandidates = [];
+      keywordInput.disabled = false;
+      keywordInput.value = '';
+      renderKeywordTags();
+      renderKeywordSuggestions();
+      keywordStatusEl.textContent = uiStrings.keywordEmptyHint;
     });
 
     logoutBtn.addEventListener('click', async () => {
