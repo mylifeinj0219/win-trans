@@ -765,6 +765,11 @@ async function broadcastToListeners(session, transcript, isFinal, lineId) {
   if (session.previewLang) targetLangs.add(session.previewLang);
   if (targetLangs.size === 0) return;
 
+  // 접속 청취자 수가 아니라 고유 언어 수만큼만 번역 API를 호출한다는 걸 런타임에서 바로 확인할 수 있도록 로그
+  console.log(
+    `번역 API 호출: 고유 언어 ${targetLangs.size}개 (접속 청취자 ${session.listeners.size}명)`
+  );
+
   const entries = await Promise.all(
     Array.from(targetLangs).map(async (lang) => {
       const [translation] = await translateClient.translate(transcript, lang);
