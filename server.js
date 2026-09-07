@@ -4,6 +4,14 @@ require('dotenv').config({ override: false });
 
 console.log('전체 환경변수 개수:', Object.keys(process.env).length);
 console.log('SESSION_SECRET 존재 여부:', 'SESSION_SECRET' in process.env);
+console.log('프록시 관련 환경변수:', {
+  http_proxy: process.env.http_proxy,
+  HTTP_PROXY: process.env.HTTP_PROXY,
+  https_proxy: process.env.https_proxy,
+  HTTPS_PROXY: process.env.HTTPS_PROXY,
+  grpc_proxy: process.env.grpc_proxy,
+  no_proxy: process.env.no_proxy,
+});
 
 const dns = require('dns');
 // 로컬(Windows, IPv4 위주 네트워크)에서는 정상 작동하는 streamingRecognize가 Railway/Cloud Run
@@ -652,7 +660,14 @@ ${rawText}
 }
 
 function startRecognizeStream(ws, session) {
-  const client = new speech.SpeechClient(googleAuthOptions);
+  // google-gax의 createStub()은 클라이언트 옵션 객체의 최상위 키 중 'grpc.'로 시작하는 것만
+  // grpc 채널 옵션으로 인식해 그대로 전달한다 (중첩된 { grpc: {...} } 형태는 인식하지 못함).
+  // 배포 환경(Railway/Cloud Run)에서만 streamingRecognize가 실패하는 문제를 조사하며,
+  // 혹시 모를 프록시 자동 감지를 명시적으로 꺼서 검증해본다.
+  const client = new speech.SpeechClient({
+    ...googleAuthOptions,
+    'grpc.enable_http_proxy': 0,
+  });
 
   let interimTimer = null; // 잠정 번역 표시용 디바운스 (기존 기능)
   let earlyFinalTimer = null; // 한국어 문장 종결 어미 감지 후 조기 확정용 디바운스
