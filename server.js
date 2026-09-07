@@ -4,21 +4,6 @@ require('dotenv').config({ override: false });
 
 console.log('전체 환경변수 개수:', Object.keys(process.env).length);
 console.log('SESSION_SECRET 존재 여부:', 'SESSION_SECRET' in process.env);
-console.log('프록시 관련 환경변수:', {
-  http_proxy: process.env.http_proxy,
-  HTTP_PROXY: process.env.HTTP_PROXY,
-  https_proxy: process.env.https_proxy,
-  HTTPS_PROXY: process.env.HTTPS_PROXY,
-  grpc_proxy: process.env.grpc_proxy,
-  no_proxy: process.env.no_proxy,
-});
-
-const dns = require('dns');
-// 로컬(Windows, IPv4 위주 네트워크)에서는 정상 작동하는 streamingRecognize가 Railway/Cloud Run
-// (둘 다 IPv6가 기본 활성화된 컨테이너 네트워크)에서만 "12 UNIMPLEMENTED"로 실패 — 인증 방식이
-// 서로 다른 두 플랫폼(Railway=JWT 키, Cloud Run=ADC)에서 동일하게 재현되는 걸로 봐서 인증/코드가
-// 아니라 네트워크 계층(IPv6 경로 이상) 문제일 가능성이 있어 IPv4를 우선하도록 강제해 검증한다.
-dns.setDefaultResultOrder('ipv4first');
 
 const http = require('http');
 const fs = require('fs');
@@ -74,32 +59,10 @@ function loadGoogleAuthOptions() {
 
 const googleAuthOptions = loadGoogleAuthOptions();
 
-// 로컬(Windows)에서는 정상 동작하는 streamingRecognize가 Railway/Cloud Run(둘 다 Linux 컨테이너)
-// 에서만 "12 UNIMPLEMENTED"로 실패하는 상황이라, 코드/설정(request, credentials)은 이미 여러 차례
-// 재현 테스트로 검증을 마쳤고 — Node 런타임/의존성 버전이 배포 환경에서 실제로 무엇인지가
-// 남은 유력한 변수라 아래에서 확인한다. package-lock.json이 커밋되어 있어 npm ci로 설치되는
-// 패키지 버전 자체는 로컬과 동일해야 하지만, 실제 Node.js 버전(Docker 베이스 이미지/Railway
-// Nixpacks가 고른 버전)은 다를 수 있다.
-function readInstalledVersion(pkgName) {
-  try {
-    // google-gax처럼 package.json의 "exports"가 하위 경로 require를 막아둔 패키지도 있어,
-    // require() 대신 node_modules 안의 package.json을 직접 읽는다.
-    const pkgJsonPath = path.join(__dirname, 'node_modules', pkgName, 'package.json');
-    return JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8')).version;
-  } catch (err) {
-    return `확인 불가(${err.message})`;
-  }
-}
-
-console.log('런타임 정보:', {
-  node: process.version,
-  platform: process.platform,
-  arch: process.arch,
-  grpcJs: readInstalledVersion('@grpc/grpc-js'),
-  googleGax: readInstalledVersion('google-gax'),
-});
-
-const translateClient = new Translate(googleAuthOptions);
+// 주의: Translate 생성자가 전달받은 옵션 객체에 apiEndpoint 등을 직접 추가(mutate)한다.
+// googleAuthOptions 원본 참조를 그대로 넘기면, 이후 이 오염된 객체를 SpeechClient가
+// 스프레드해서 받아 번역 API 엔드포인트로 잘못 연결되는 문제가 있어 복사본을 넘긴다.
+const translateClient = new Translate({ ...googleAuthOptions });
 
 const anthropicClient = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -660,14 +623,7 @@ ${rawText}
 }
 
 function startRecognizeStream(ws, session) {
-  // google-gax의 createStub()은 클라이언트 옵션 객체의 최상위 키 중 'grpc.'로 시작하는 것만
-  // grpc 채널 옵션으로 인식해 그대로 전달한다 (중첩된 { grpc: {...} } 형태는 인식하지 못함).
-  // 배포 환경(Railway/Cloud Run)에서만 streamingRecognize가 실패하는 문제를 조사하며,
-  // 혹시 모를 프록시 자동 감지를 명시적으로 꺼서 검증해본다.
-  const client = new speech.SpeechClient({
-    ...googleAuthOptions,
-    'grpc.enable_http_proxy': 0,
-  });
+  const client = new speech.SpeechClient({ ...googleAuthOptions });
 
   let interimTimer = null; // 잠정 번역 표시용 디바운스 (기존 기능)
   let earlyFinalTimer = null; // 한국어 문장 종결 어미 감지 후 조기 확정용 디바운스
